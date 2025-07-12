@@ -10,41 +10,41 @@ import argparse
 PLATFORM_CONFIGS = {
     "nrf5340": {
         "base": 0x50001000,  # Updated base address
-        "enable_offset": 0x50c,
+        "enable_offset": 0x50C,
         "inst_hit_offset": 0x400,
         "inst_miss_offset": 0x404,
         "data_hit_offset": 0x408,
-        "data_miss_offset": 0x40c,
+        "data_miss_offset": 0x40C,
         "has_inst": True,
-        "has_data": True
+        "has_data": True,
     },
     "nrf7002": {  # Use the same as nrf5340
         "base": 0x50001000,
-        "enable_offset": 0x50c,
+        "enable_offset": 0x50C,
         "inst_hit_offset": 0x400,
         "inst_miss_offset": 0x404,
         "data_hit_offset": 0x408,
-        "data_miss_offset": 0x40c,
+        "data_miss_offset": 0x40C,
         "has_inst": True,
-        "has_data": True
+        "has_data": True,
     },
     "nrf54l15": {
         "base": 0xE0082000,
         "enable_offset": 0x414,  # PROFILING.ENABLE
-        "clear_offset": 0x418,   # PROFILING.CLEAR
-        "hit_offset": 0x41C,     # PROFILING.HIT
-        "miss_offset": 0x420,    # PROFILING.MISS
-        "lmiss_offset": 0x424,   # PROFILING.LMISS
+        "clear_offset": 0x418,  # PROFILING.CLEAR
+        "hit_offset": 0x41C,  # PROFILING.HIT
+        "miss_offset": 0x420,  # PROFILING.MISS
+        "lmiss_offset": 0x424,  # PROFILING.LMISS
         "has_inst": False,
         "has_data": False,
         # No need for has_hit/has_miss/has_lmiss, just dump hit/miss
-    }
+    },
 }
 
-SERIAL_PORT = '/dev/ttyACM1'
+SERIAL_PORT = "/dev/ttyACM1"
 BAUDRATE = 115200
 TIMEOUT = 5
-PROMPT = 'uart:~$'
+PROMPT = "uart:~$"
 DEBUG = False
 
 
@@ -58,18 +58,18 @@ def send_command(ser, command):
     """Send a command and return the response."""
     ser.reset_input_buffer()  # Flush input buffer before sending
     debug_print(f"Sending: {command}")
-    ser.write(f"{command}\r".encode('utf-8'))
+    ser.write(f"{command}\r".encode("utf-8"))
     ser.flush()
     time.sleep(0.5)
-    
+
     # Read response
     response = ""
     start_time = time.time()
     command_echoed = False
-    
+
     while time.time() - start_time < TIMEOUT:
         if ser.in_waiting:
-            line = ser.readline().decode(errors='replace').strip()
+            line = ser.readline().decode(errors="replace").strip()
             if line:
                 debug_print(f"Received: '{line}'")
                 # Skip the command echo (first line that matches our command)
@@ -79,7 +79,7 @@ def send_command(ser, command):
                     continue
                 response += line + "\n"
                 # Stop when we see the prompt or a result
-                if PROMPT in line or 'Read value' in line or 'Writing value' in line:
+                if PROMPT in line or "Read value" in line or "Writing value" in line:
                     break
         else:
             time.sleep(0.1)
@@ -89,13 +89,13 @@ def send_command(ser, command):
 
 def parse_devmem_value(response):
     """Parse the hex value from devmem response."""
-    match = re.search(r'Read value (0x[0-9a-fA-F]+)', response)
+    match = re.search(r"Read value (0x[0-9a-fA-F]+)", response)
     if match:
         hex_value = match.group(1)
         # Always return int, even if 0
         return int(hex_value, 16)
     # If we see 'Read value 0x0' explicitly, return 0
-    if 'Read value 0x0' in response:
+    if "Read value 0x0" in response:
         return 0
     return None
 
@@ -106,17 +106,17 @@ def execute_devmem(ser, address, value=None, width=32):
         command = f"devmem {address} {width} {value}"
     else:
         command = f"devmem {address} {width}"
-    
+
     debug_print(f"execute_devmem called with address={address}, value={value}")
     response = send_command(ser, command)
     if value is not None:
         # For writes, treat 'Writing value', prompt, or empty as success
-        if 'Writing value' in response or PROMPT in response or response.strip() == '':
+        if "Writing value" in response or PROMPT in response or response.strip() == "":
             return True
         return False
     else:
         # If we get only the prompt and no 'Read value', warn in debug
-        if 'Read value' not in response and PROMPT in response:
+        if "Read value" not in response and PROMPT in response:
             debug_print(f"WARNING: No value returned for {address}, got only prompt.")
         return parse_devmem_value(response)
 
@@ -160,7 +160,7 @@ def check_cache_profiling_enabled(ser, enable_reg):
     debug_print(f"Checking if cache profiling is enabled at {enable_reg}")
     result = execute_devmem(ser, enable_reg, value=None, width=32)
     if result is not None:
-        enabled = (result != 0)
+        enabled = result != 0
         debug_print(f"Cache profiling enabled: {enabled} (value: {result})")
         return enabled
     else:
@@ -179,7 +179,7 @@ def calculate_hit_rate(hits, misses):
 def read_cache_counters(ser, platform_config):
     """Read all cache counters and display a nice summary."""
     print("Reading cache counters...")
-    
+
     # Check if cache profiling is enabled
     enable_reg = platform_config["base"] + platform_config["enable_offset"]
     if not check_cache_profiling_enabled(ser, f"0x{enable_reg:08x}"):
@@ -187,15 +187,16 @@ def read_cache_counters(ser, platform_config):
         print("Please enable cache profiling first:")
         print("  python3 cache_profiler_serial.py nrf5340 enable")
         return {}
-    
+
     print("✓ Cache profiling is enabled")
-    
+
     counters = {}
     missing = []
 
     # nrf54l15: just dump hit/miss/lmiss
     if "nrf54l15" in platform_config.get("name", "nrf54l15") or (
-        not platform_config.get("has_inst", False) and not platform_config.get("has_data", False)
+        not platform_config.get("has_inst", False)
+        and not platform_config.get("has_data", False)
     ):
         # Optionally clear counters before reading (uncomment if needed)
         # clear_reg = platform_config["base"] + platform_config["clear_offset"]
@@ -226,11 +227,13 @@ def read_cache_counters(ser, platform_config):
         # legacy style (nrf5340/nrf7002)
         if platform_config["has_inst"]:
             inst_hit_reg = platform_config["base"] + platform_config["inst_hit_offset"]
-            inst_miss_reg = platform_config["base"] + platform_config["inst_miss_offset"]
-            
+            inst_miss_reg = (
+                platform_config["base"] + platform_config["inst_miss_offset"]
+            )
+
             inst_hit = execute_devmem(ser, f"0x{inst_hit_reg:08x}")
             inst_miss = execute_devmem(ser, f"0x{inst_miss_reg:08x}")
-            
+
             if inst_hit is not None:
                 counters["instruction_hit"] = inst_hit
             else:
@@ -239,14 +242,16 @@ def read_cache_counters(ser, platform_config):
                 counters["instruction_miss"] = inst_miss
             else:
                 missing.append("instruction_miss")
-        
+
         if platform_config["has_data"]:
             data_hit_reg = platform_config["base"] + platform_config["data_hit_offset"]
-            data_miss_reg = platform_config["base"] + platform_config["data_miss_offset"]
-            
+            data_miss_reg = (
+                platform_config["base"] + platform_config["data_miss_offset"]
+            )
+
             data_hit = execute_devmem(ser, f"0x{data_hit_reg:08x}")
             data_miss = execute_devmem(ser, f"0x{data_miss_reg:08x}")
-            
+
             if data_hit is not None:
                 counters["data_hit"] = data_hit
             else:
@@ -255,12 +260,12 @@ def read_cache_counters(ser, platform_config):
                 counters["data_miss"] = data_miss
             else:
                 missing.append("data_miss")
-    
+
     # Display nice summary
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)
     print("CACHE PROFILING SUMMARY")
-    print("="*50)
-    
+    print("=" * 50)
+
     # nrf54l15 summary (just dump hit/miss/lmiss)
     if "hit" in counters or "miss" in counters or "line_miss" in counters:
         hits = counters.get("hit", "N/A")
@@ -285,11 +290,11 @@ def read_cache_counters(ser, platform_config):
         if "instruction_hit" in counters or "instruction_miss" in counters:
             inst_hits = counters.get("instruction_hit", "N/A")
             inst_misses = counters.get("instruction_miss", "N/A")
-            
+
             print(f"Instruction Cache:")
             print(f"  Hits:     {inst_hits}")
             print(f"  Misses:   {inst_misses}")
-            
+
             if inst_hits != "N/A" and inst_misses != "N/A":
                 inst_total = inst_hits + inst_misses
                 inst_hit_rate = calculate_hit_rate(inst_hits, inst_misses)
@@ -302,16 +307,16 @@ def read_cache_counters(ser, platform_config):
         else:
             print("Instruction Cache: Not available")
             print()
-        
+
         # Show data cache if we have at least one counter
         if "data_hit" in counters or "data_miss" in counters:
             data_hits = counters.get("data_hit", "N/A")
             data_misses = counters.get("data_miss", "N/A")
-            
+
             print(f"Data Cache:")
             print(f"  Hits:     {data_hits}")
             print(f"  Misses:   {data_misses}")
-            
+
             if data_hits != "N/A" and data_misses != "N/A":
                 data_total = data_hits + data_misses
                 data_hit_rate = calculate_hit_rate(data_hits, data_misses)
@@ -324,15 +329,19 @@ def read_cache_counters(ser, platform_config):
         else:
             print("Data Cache: Not available")
             print()
-        
+
         # Show overall stats only if we have all counters
-        if ("instruction_hit" in counters and "instruction_miss" in counters and
-            "data_hit" in counters and "data_miss" in counters):
+        if (
+            "instruction_hit" in counters
+            and "instruction_miss" in counters
+            and "data_hit" in counters
+            and "data_miss" in counters
+        ):
             total_hits = counters["instruction_hit"] + counters["data_hit"]
             total_misses = counters["instruction_miss"] + counters["data_miss"]
             total_accesses = total_hits + total_misses
             overall_hit_rate = calculate_hit_rate(total_hits, total_misses)
-            
+
             print(f"Overall Cache Performance:")
             print(f"  Total Hits:     {total_hits:,}")
             print(f"  Total Misses:   {total_misses:,}")
@@ -344,10 +353,12 @@ def read_cache_counters(ser, platform_config):
                 print("Missing counters:", ", ".join(missing))
         else:
             print("No cache counters available")
-            print("Try enabling cache profiling first: python3 cache_profiler_serial.py nrf5340 enable")
-    
-    print("="*50)
-    
+            print(
+                "Try enabling cache profiling first: python3 cache_profiler_serial.py nrf5340 enable"
+            )
+
+    print("=" * 50)
+
     return counters
 
 
@@ -376,39 +387,41 @@ def show_usage():
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Cache Profiler using Python serial')
-    parser.add_argument('platform', help='Platform (nrf5340, nrf7002, nrf54l15)')
-    parser.add_argument('command', nargs='?', help='Command (enable, disable, read, stats)')
-    parser.add_argument('--debug', action='store_true', help='Enable debug output')
-    
+    parser = argparse.ArgumentParser(description="Cache Profiler using Python serial")
+    parser.add_argument("platform", help="Platform (nrf5340, nrf7002, nrf54l15)")
+    parser.add_argument(
+        "command", nargs="?", help="Command (enable, disable, read, stats)"
+    )
+    parser.add_argument("--debug", action="store_true", help="Enable debug output")
+
     args = parser.parse_args()
-    
+
     global DEBUG
     DEBUG = args.debug
-    
+
     if args.platform not in PLATFORM_CONFIGS:
         print(f"Error: Platform '{args.platform}' not supported")
         print("Supported platforms:", list(PLATFORM_CONFIGS.keys()))
         return
-    
+
     platform_config = PLATFORM_CONFIGS[args.platform]
     enable_reg = platform_config["base"] + platform_config["enable_offset"]
     # Add platform name for easier detection in read_cache_counters
     platform_config["name"] = args.platform
-    
+
     debug_print("Script starting")
     print(f"Platform: {args.platform}")
     debug_print(f"Serial device: {SERIAL_PORT}")
     debug_print(f"Enable register: 0x{enable_reg:08x}")
     debug_print(f"Command: {args.command}")
-    
+
     try:
         with serial.Serial(SERIAL_PORT, BAUDRATE, timeout=1) as ser:
             # Flush buffers
             ser.reset_input_buffer()
             ser.reset_output_buffer()
             time.sleep(0.2)
-            
+
             if args.command == "enable":
                 debug_print("Calling enable_cache_profiling")
                 enable_cache_profiling(ser, f"0x{enable_reg:08x}")
@@ -419,12 +432,12 @@ def main():
             else:
                 print(f"Error: Unknown command '{args.command}'")
                 show_usage()
-                
+
     except serial.SerialException as e:
         print(f"Error: Could not open serial port {SERIAL_PORT}: {e}")
     except KeyboardInterrupt:
         print("\nInterrupted by user")
 
 
-if __name__ == '__main__':
-    main() 
+if __name__ == "__main__":
+    main()
